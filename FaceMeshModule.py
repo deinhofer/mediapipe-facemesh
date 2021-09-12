@@ -1,8 +1,7 @@
 import cv2
-import cv2.cv2
 import mediapipe as mp
 import time
-
+import mouse
 
 class FaceMeshDetector():
     def __init__(self, staticMode=False, maxFaces=1, minDetectionCon=0.5, minTrackCon=0.5):
@@ -21,28 +20,30 @@ class FaceMeshDetector():
         self.imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.faceMesh.process(self.imgRGB)
 
-        faces=[]
+        faces = []
         if self.results.multi_face_landmarks:
-            faces=[]
+            faces = []
             for faceLms in self.results.multi_face_landmarks:
                 if draw:
                     self.mpDraw.draw_landmarks(img, faceLms, self.mpFaceMesh.FACE_CONNECTIONS,
-                                           landmark_drawing_spec=self.drawSpec, connection_drawing_spec=self.drawSpec)
+                                               landmark_drawing_spec=self.drawSpec,
+                                               connection_drawing_spec=self.drawSpec)
                     drawEyeRegions(img, faceLms.landmark)
 
-                face=[]
-                for id,lm in enumerate(faceLms.landmark):
-                    ih,iw,ic=img.shape
-                    x,y=int(lm.x*iw),int(lm.y*ih)
-                    #print(id,x,y)
-                    #if id % 2 == 0:
+                face = []
+                for id, lm in enumerate(faceLms.landmark):
+                    ih, iw, ic = img.shape
+                    x, y = int(lm.x * iw), int(lm.y * ih)
+                    # print(id,x,y)
+                    # if id % 2 == 0:
                     #    cv2.cv2.putText(img, str(id), (x, y), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
-                    #if id == 176:
+                    # if id == 176:
                     #    cv2.cv2.putText(img, str(id), (x, y), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
 
-                    face.append([x,y])
+                    face.append([x, y])
                 faces.append(face)
         return img, faces
+
 
 # Crop the right eye region
 def getRightEye(img, lm):
@@ -52,6 +53,7 @@ def getRightEye(img, lm):
     eye_right = int(lm[263].x * img.shape[1])
     right_eye = img[eye_top:eye_bottom, eye_left:eye_right]
     return right_eye
+
 
 # Get the right eye coordinates on the actual -> to visualize the bbox
 def getRightEyeRect(img, lm):
@@ -92,30 +94,37 @@ def getLeftEyeRect(img, lm):
     y = eye_top
     return x, y, w, h
 
+
 def drawEyeRegions(img, lm):
     # Visualize the Left and Region by drawing a rectangle on it on the actual image.
     # RIGH EYE
-    rightEyeImg = getRightEye(img, lm)
-    rightEyeHeight, rightEyeWidth, _ = rightEyeImg.shape
+    # rightEyeImg = getRightEye(img, lm)
+    # rightEyeHeight, rightEyeWidth, _ = rightEyeImg.shape
 
     xRightEye, yRightEye, rightEyeWidth, rightEyeHeight = getRightEyeRect(img, lm)
     cv2.rectangle(img, (xRightEye, yRightEye),
                   (xRightEye + rightEyeWidth, yRightEye + rightEyeHeight), (200, 21, 36), 2)
 
     # LEFT EYE
-    leftEyeImg = getLeftEye(img, lm)
-    leftEyeHeight, leftEyeWidth, _ = leftEyeImg.shape
+    # leftEyeImg = getLeftEye(img, lm)
+    # leftEyeHeight, leftEyeWidth, _ = leftEyeImg.shape
 
     xLeftEye, yLeftEye, leftEyeWidth, leftEyeHeight = getLeftEyeRect(img, lm)
     cv2.rectangle(img, (xLeftEye, yLeftEye),
                   (xLeftEye + leftEyeWidth, yLeftEye + leftEyeHeight), (200, 21, 36), 2)
 
+
 def main():
-    cap = cv2.VideoCapture(4)
+    cap = cv2.VideoCapture(2)
     # Set properties. Each returns === True on success (i.e. correct resolution)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    pTime = 0
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+    c_time = time.time()
+    p_time = 0
+
+    #p_w, p_h = mouse.size()
+    #p_w = p_w / 2
+    #p_h = p_h / 2
     detector = FaceMeshDetector()
 
     while True:
@@ -128,19 +137,23 @@ def main():
         # resize image
         img = cv2.resize(img, dim, interpolation=cv2.INTER_AREA)
 
-        img,faces = detector.findFaceMesh(img)
-        print(img.shape)
-        #if len(faces) != 0:
-            #print(faces[0])
+        img, faces = detector.findFaceMesh(img)
+        # print(img.shape)
+        if len(faces) != 0:
+            if c_time % 30:
+                # print(faces[0][0]-p_coords)
+                mouse.move(faces[0][0][0],faces[0][0][1],absolute=True,duration=0)
 
-        cTime = time.time()
-        fps = 1 / (cTime - pTime)
+        c_time = time.time()
+        fps = 1 / (c_time - p_time)
 
-        cv2.cv2.putText(img, f'FPS: {int(fps)}', (20, 70), cv2.FONT_HERSHEY_PLAIN, 3, (0, 255, 0), 3)
+        cv2.putText(img, f'FPS: {int(fps)}', (20, 70), cv2.FONT_HERSHEY_PLAIN, 3, (0, 255, 0), 3)
 
         cv2.imshow("Image", img)
-        pTime = cTime
-        cv2.waitKey(1)
+        p_time = c_time
+        key = cv2.waitKey(1)
+        if key == 27:
+            break
 
 
 if __name__ == "__main__":
